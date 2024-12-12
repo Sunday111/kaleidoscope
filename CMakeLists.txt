@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 
 project(Kaleidoscope)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -45,5 +45,26 @@ FetchContent_Declare(
   GIT_SHALLOW    1
 )
 FetchContent_MakeAvailable(gtest)
+
+# Magic Enum
+FetchContent_Declare(
+  magic_enum
+  GIT_REPOSITORY https://github.com/Neargye/magic_enum
+  GIT_TAG        "v0.9.7"
+  GIT_SHALLOW    1
+)
+FetchContent_MakeAvailable(magic_enum)
+
+# ASS
+option(ASS_ENABLE_TESTING "" ON)
+option(ASS_FETCH_GOOGLE_TESTS "" OFF)
+option(ASS_FIND_GTEST_PACKAGE "" OFF)
+FetchContent_Declare(
+  ass
+  GIT_REPOSITORY https://github.com/Sunday111/ass
+  GIT_TAG        "main"
+  GIT_SHALLOW    1
+)
+FetchContent_MakeAvailable(ass)
 
 add_subdirectory(src)
