@@ -67,4 +67,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(ass)
 
+# fast float
+option(FASTFLOAT_INSTALL "" OFF)
+FetchContent_Declare(
+  fast_float
+  GIT_REPOSITORY https://github.com/fastfloat/fast_float
+  GIT_TAG        "v7.0.0"
+  GIT_SHALLOW    1
+)
+FetchContent_MakeAvailable(fast_float)
+
 add_subdirectory(src)

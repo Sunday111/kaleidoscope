@@ -11,9 +11,10 @@ enum class TokenType : uint8_t
     Extern,
     Identifier,
     FloatLiteral,
-    IntegralLiteral,
+    DecimalLiteral,
     HexadecimalLiteral,
-    ScientificNotationLiteral,
+    BinaryLiteral,
+    OctalLiteral,
     EndOfFile
 };
 }  // namespace kaleidoscope

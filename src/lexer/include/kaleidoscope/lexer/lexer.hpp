@@ -2,7 +2,6 @@
 
 #include <cassert>
 #include <expected>
-#include <print>
 #include <string_view>
 
 #include "ass/fixed_unordered_map.hpp"
@@ -24,10 +23,10 @@ public:
 enum class LexerErrorType : uint8_t
 {
     UnexpectedSymbol,
-    LeadingZeroInIntegerLiteral,
-    ZeroLengthSignificandInScientificNotation,
+    LeadingZeroInDecimalLiteral,
     ZeroLengthExponentInScientificNotation,
     NeedAtLeastOneDigitAroundDotInFloatLiteral,
+    MultipleDotsInFloatingPointLiteral,
 };
 
 class LexerError
@@ -99,6 +98,7 @@ inline constexpr auto kIdentifierHeadChars = kLetters | BitsetFromChars("_");
 inline constexpr auto kIdentifierTailChars = kIdentifierHeadChars | kDigits;
 inline constexpr auto kSpaceChars = BitsetFromChars(" \f\n\r\t\v");
 inline constexpr auto kHexDigits = kDigits | BitsetFromCharRange('a', 'f') | BitsetFromCharRange('A', 'F');
+inline constexpr auto kOctalDigits = BitsetFromCharRange('0', '7');
 
 class Lexer
 {
@@ -144,132 +144,241 @@ public:
     }
 
 private:
-    [[nodiscard]] constexpr LexerResult ReadNumber() noexcept
+    [[nodiscard]] constexpr LexerResult ReadFloatingPointNumber() noexcept
     {
-        // Assumes the current pos pointing at digit or at '.' symbol
-        assert(HasChars());
         size_t begin = pos_;
+        std::optional<size_t> dot;
 
-        // Skip digits until meet something else
-        auto skip_digits = [&]
+        // Read just floating point number
+        // Stop on exponent indicator, space or '_'.
+        // Remember the position of the dot character.
+        while (HasChars())
         {
-            while (HasChars() && IsDigit(text_[pos_])) ++pos_;
-        };
+            char c = text_[pos_];
+            if (IsSpaceChar(c) || c == 'e' || c == 'E' || c == '_') break;
 
-        auto read_exponent = [&]() -> LexerResult
-        {
-            size_t e_pos = pos_++;
-
-            // This case: .e3
-            const size_t chars_before_e = e_pos - begin;
-            if (chars_before_e == 1 && text_[e_pos - 1] == '.')
+            if (c == '.')
             {
-                return std::unexpected(
-                    LexerError{
-                        .type = LexerErrorType::ZeroLengthSignificandInScientificNotation,
-                        .pos = e_pos - 1,
-                    });
+                if (dot)
+                {
+                    return std::unexpected(
+                        LexerError{
+                            .type = LexerErrorType::MultipleDotsInFloatingPointLiteral,
+                            .pos = pos_,
+                        });
+                }
+
+                dot = pos_;
             }
 
-            skip_digits();
+            ++pos_;
+        }
 
-            // This case: 2e , 2.5e
-            if (pos_ - e_pos == 1)
+        if (dot && begin + 1 == pos_)
+        {
+            return std::unexpected(
+                LexerError{
+                    .type = LexerErrorType::NeedAtLeastOneDigitAroundDotInFloatLiteral,
+                    .pos = *dot,
+                });
+        }
+
+        // Scientific notation
+        if (HasChars() && (text_[pos_] == 'e' || text_[pos_] == 'E'))
+        {
+            size_t e = pos_++;
+            while (HasChars() && IsDigit(text_[pos_])) ++pos_;
+
+            if (pos_ - e == 1)
             {
                 return std::unexpected(
                     LexerError{
                         .type = LexerErrorType::ZeroLengthExponentInScientificNotation,
-                        .pos = e_pos,
+                        .pos = e,
                     });
             }
 
-            return LexerToken{
-                .type = TokenType::ScientificNotationLiteral,
-                .begin = begin,
-                .end = pos_,
-            };
-        };
-
-        auto read_from_dot = [&] -> LexerResult
-        {
-            // it can be either regular float literal or scientific notation
-            const size_t dot_pos = pos_++;
-
-            skip_digits();
-
-            if (HasChars() && (text_[pos_] == 'e' || text_[pos_] == 'E'))
+            if (HasChars())
             {
-                return read_exponent();
+                char c = text_[pos_];
+                if (!IsSpaceChar(c) && c != '_')
+                {
+                    return std::unexpected(
+                        LexerError{
+                            .type = LexerErrorType::UnexpectedSymbol,
+                            .pos = pos_,
+                        });
+                }
             }
+        }
 
-            if ((pos_ == dot_pos + 1) && begin == dot_pos)
+        return LexerToken{
+            .type = TokenType::FloatLiteral,
+            .begin = begin,
+            .end = pos_,
+        };
+    }
+
+    [[nodiscard]] constexpr LexerResult ReadDecimalNumber() noexcept
+    {
+        size_t begin = pos_;
+
+        if (text_[pos_] == '0')
+        {
+            ++pos_;
+            if (HasChars() && IsDigit(text_[pos_]))
             {
                 return std::unexpected(
                     LexerError{
-                        .type = LexerErrorType::NeedAtLeastOneDigitAroundDotInFloatLiteral,
-                        .pos = dot_pos,
+                        .type = LexerErrorType::LeadingZeroInDecimalLiteral,
+                        .pos = pos_,
                     });
             }
+        }
 
-            return LexerToken{
-                .type = TokenType::FloatLiteral,
-                .begin = begin,
-                .end = pos_,
-            };
+        while (HasChars() && IsDigit(text_[pos_])) ++pos_;
+
+        if (HasChars())
+        {
+            char c = text_[pos_];
+            if (!IsSpaceChar(c) && c != '_')
+            {
+                return std::unexpected(
+                    LexerError{
+                        .type = LexerErrorType::UnexpectedSymbol,
+                        .pos = pos_,
+                    });
+            }
+        }
+
+        return LexerToken{
+            .type = TokenType::DecimalLiteral,
+            .begin = begin,
+            .end = pos_,
         };
+    }
 
-        if (text_[begin] == '.') return read_from_dot();
+    [[nodiscard]] constexpr LexerResult ReadHexNumber() noexcept
+    {
+        size_t begin = pos_;
 
-        assert(std::isdigit(text_[begin]));
+        pos_ += 2;
 
-        skip_digits();
+        while (HasChars() && IsHexDigit(text_[pos_])) ++pos_;
 
-        size_t int_length = pos_ - begin;
-        size_t lead_zeroes = 0;
-        for (size_t i = begin; i != pos_ && text_[i] == '0'; ++i)
+        if (HasChars())
         {
-            ++lead_zeroes;
+            char c = text_[pos_];
+            if (!IsSpaceChar(c) && c != '_')
+            {
+                return std::unexpected(
+                    LexerError{
+                        .type = LexerErrorType::UnexpectedSymbol,
+                        .pos = pos_,
+                    });
+            }
         }
 
-        //  (octal numbers are not supported)
-        if (lead_zeroes > 0 && int_length > 1)
+        return LexerToken{
+            .type = TokenType::HexadecimalLiteral,
+            .begin = begin,
+            .end = pos_,
+        };
+    }
+
+    [[nodiscard]] constexpr LexerResult ReadBinaryNumber() noexcept
+    {
+        size_t begin = pos_;
+        pos_ += 2;
+
+        static constexpr auto chars = BitsetFromChars("01");
+        while (HasChars() && OneOf(text_[pos_], chars)) ++pos_;
+
+        if (HasChars())
         {
-            return std::unexpected(
-                LexerError{
-                    .type = LexerErrorType::LeadingZeroInIntegerLiteral,
-                    .pos = begin,
-                });
+            char c = text_[pos_];
+            if (!IsSpaceChar(c) && c != '_')
+            {
+                return std::unexpected(
+                    LexerError{
+                        .type = LexerErrorType::UnexpectedSymbol,
+                        .pos = pos_,
+                    });
+            }
         }
 
-        if (HasChars() && text_[pos_] == '.')
-        {
-            return read_from_dot();
-        }
-        else if (HasChars() && (text_[pos_] == 'e' || text_[pos_] == 'E'))
-        {
-            return read_exponent();
-        }
-        else if (HasChars() && (text_[pos_] == 'X' || text_[pos_] == 'x'))
-        {
-            pos_++;
+        return LexerToken{
+            .type = TokenType::BinaryLiteral,
+            .begin = begin,
+            .end = pos_,
+        };
+    }
 
-            while (HasChars() && IsHexDigit(text_[pos_])) ++pos_;
+    [[nodiscard]] constexpr LexerResult ReadOctalNumber() noexcept
+    {
+        size_t begin = pos_;
 
-            return LexerToken{
-                .type = TokenType::HexadecimalLiteral,
-                .begin = begin,
-                .end = pos_,
-            };
-        }
-        else
+        while (HasChars() && OneOf(text_[pos_], kOctalDigits)) ++pos_;
+
+        if (HasChars())
         {
-            // Met nothing but digits. Test the leading part does not start with zeroes
-            return LexerToken{
-                .type = TokenType::IntegralLiteral,
-                .begin = begin,
-                .end = pos_,
-            };
+            char c = text_[pos_];
+            if (!IsSpaceChar(c) && c != '_')
+            {
+                return std::unexpected(
+                    LexerError{
+                        .type = LexerErrorType::UnexpectedSymbol,
+                        .pos = pos_,
+                    });
+            }
         }
+
+        return LexerToken{
+            .type = TokenType::OctalLiteral,
+            .begin = begin,
+            .end = pos_,
+        };
+    }
+
+    [[nodiscard]] constexpr LexerResult ReadNumber() noexcept
+    {
+        assert(HasChars());
+
+        size_t begin = pos_;
+
+        if (IsDigit(text_[pos_]))
+        {
+            // Simple decimal numbers are the most common case
+            auto decimal_result = ReadDecimalNumber();
+            if (decimal_result.has_value())
+            {
+                return decimal_result;
+            }
+            else
+            {
+                pos_ = begin;
+            }
+        }
+
+        if (text_[pos_] == '0')
+        {
+            char char_after_zero = text_[pos_ + 1];
+            switch (char_after_zero)
+            {
+            case 'x':
+            case 'X':
+                return ReadHexNumber();
+                break;
+            case 'b':
+            case 'B':
+                return ReadBinaryNumber();
+                break;
+            }
+
+            if (IsDigit(char_after_zero)) return ReadOctalNumber();
+        }
+
+        return ReadFloatingPointNumber();
     }
 
     [[nodiscard]] constexpr LexerToken ReadIdentifier() noexcept

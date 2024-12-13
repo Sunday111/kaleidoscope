@@ -19,7 +19,7 @@ TEST(LexerTest, ZeroInt)
     ASSERT_EQ(
         token.value(),
         (LexerToken{
-            .type = TokenType::IntegralLiteral,
+            .type = TokenType::DecimalLiteral,
             .begin = 0,
             .end = 1,
         }));
@@ -34,7 +34,7 @@ TEST(LexerTest, TwoZeroInts)
     ASSERT_EQ(
         token,
         (LexerToken{
-            .type = TokenType::IntegralLiteral,
+            .type = TokenType::DecimalLiteral,
             .begin = 0,
             .end = 1,
         }));
@@ -44,7 +44,7 @@ TEST(LexerTest, TwoZeroInts)
     ASSERT_EQ(
         token.value(),
         (LexerToken{
-            .type = TokenType::IntegralLiteral,
+            .type = TokenType::DecimalLiteral,
             .begin = 2,
             .end = 3,
         }));
@@ -59,12 +59,13 @@ TEST(LexerTest, TwoLeadingZeroes)
     kaleidoscope::Lexer lexer("001");
     using namespace kaleidoscope;  // NOLINT
     auto token = lexer.GetToken();
-    ASSERT_FALSE(token.has_value());
+    ASSERT_TRUE(token.has_value());
     ASSERT_EQ(
-        token.error(),
-        (LexerError{
-            .type = LexerErrorType::LeadingZeroInIntegerLiteral,
-            .pos = 0,
+        token.value(),
+        (LexerToken{
+            .type = TokenType::OctalLiteral,
+            .begin = 0,
+            .end = 3,
         }));
 }
 
@@ -106,7 +107,7 @@ TEST(LexerTest, ExpAfterDot)
     ASSERT_EQ(
         token.value(),
         (LexerToken{
-            .type = TokenType::ScientificNotationLiteral,
+            .type = TokenType::FloatLiteral,
             .begin = 0,
             .end = 4,
         }));
@@ -121,7 +122,7 @@ TEST(LexerTest, ZeroLengthSignificand)
     ASSERT_EQ(
         token.error(),
         (LexerError{
-            .type = LexerErrorType::ZeroLengthSignificandInScientificNotation,
+            .type = LexerErrorType::NeedAtLeastOneDigitAroundDotInFloatLiteral,
             .pos = 0,
         }));
 }
