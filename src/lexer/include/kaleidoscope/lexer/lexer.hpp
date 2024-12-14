@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <expected>
+#include <print>
 #include <string_view>
 
 #include "ass/fixed_unordered_map.hpp"
@@ -13,6 +14,8 @@ namespace kaleidoscope
 class LexerToken
 {
 public:
+    [[nodiscard]] constexpr bool operator<=>(const LexerToken&) const noexcept = default;
+
     TokenType type = TokenType::EndOfFile;
     size_t begin = 0;
     size_t end = 0;
@@ -22,12 +25,16 @@ enum class LexerErrorType : uint8_t
 {
     UnexpectedSymbol,
     LeadingZeroInIntegerLiteral,
+    ZeroLengthSignificandInScientificNotation,
     ZeroLengthExponentInScientificNotation,
+    NeedAtLeastOneDigitAroundDotInFloatLiteral,
 };
 
 class LexerError
 {
 public:
+    [[nodiscard]] constexpr bool operator<=>(const LexerError&) const noexcept = default;
+
     LexerErrorType type;
     size_t pos;
 };
@@ -141,27 +148,79 @@ private:
     {
         // Assumes the current pos pointing at digit or at '.' symbol
         assert(HasChars());
-        size_t begin = pos_++;
-
-        if (text_[begin] == '.')
-        {
-            ++pos_;
-
-            while (HasChars() && IsDigit(text_[pos_]))
-            {
-                ++pos_;
-            }
-
-            return LexerToken{.type = TokenType::FloatLiteral, .begin = begin, .end = pos_};
-        }
-
-        assert(std::isdigit(text_[begin]));
+        size_t begin = pos_;
 
         // Skip digits until meet something else
         auto skip_digits = [&]
         {
             while (HasChars() && IsDigit(text_[pos_])) ++pos_;
         };
+
+        auto read_exponent = [&]() -> LexerResult
+        {
+            size_t e_pos = pos_++;
+
+            // This case: .e3
+            const size_t chars_before_e = e_pos - begin;
+            if (chars_before_e == 1 && text_[e_pos - 1] == '.')
+            {
+                return std::unexpected(
+                    LexerError{
+                        .type = LexerErrorType::ZeroLengthSignificandInScientificNotation,
+                        .pos = e_pos - 1,
+                    });
+            }
+
+            skip_digits();
+
+            // This case: 2e , 2.5e
+            if (pos_ - e_pos == 1)
+            {
+                return std::unexpected(
+                    LexerError{
+                        .type = LexerErrorType::ZeroLengthExponentInScientificNotation,
+                        .pos = e_pos,
+                    });
+            }
+
+            return LexerToken{
+                .type = TokenType::ScientificNotationLiteral,
+                .begin = begin,
+                .end = pos_,
+            };
+        };
+
+        auto read_from_dot = [&] -> LexerResult
+        {
+            // it can be either regular float literal or scientific notation
+            const size_t dot_pos = pos_++;
+
+            skip_digits();
+
+            if (HasChars() && (text_[pos_] == 'e' || text_[pos_] == 'E'))
+            {
+                return read_exponent();
+            }
+
+            if ((pos_ == dot_pos + 1) && begin == dot_pos)
+            {
+                return std::unexpected(
+                    LexerError{
+                        .type = LexerErrorType::NeedAtLeastOneDigitAroundDotInFloatLiteral,
+                        .pos = dot_pos,
+                    });
+            }
+
+            return LexerToken{
+                .type = TokenType::FloatLiteral,
+                .begin = begin,
+                .end = pos_,
+            };
+        };
+
+        if (text_[begin] == '.') return read_from_dot();
+
+        assert(std::isdigit(text_[begin]));
 
         skip_digits();
 
@@ -182,48 +241,11 @@ private:
                 });
         }
 
-        auto read_exponent = [&]() -> LexerResult
-        {
-            size_t e_pos = pos_++;
-            skip_digits();
-            if (pos_ - e_pos > 1)
-            {
-                return LexerToken{
-                    .type = TokenType::ScientificNotationLiteral,
-                    .begin = begin,
-                    .end = pos_,
-                };
-            }
-            else
-            {
-                return std::unexpected(
-                    LexerError{
-                        .type = LexerErrorType::ZeroLengthExponentInScientificNotation,
-                        .pos = e_pos,
-                    });
-            }
-        };
-
         if (HasChars() && text_[pos_] == '.')
         {
-            pos_++;
-            skip_digits();
-
-            if (HasChars() && text_[pos_] == 'e')
-            {
-                return read_exponent();
-            }
-            else
-            {
-                // Met nothing but digits. Test the leading part does not start with zeroes
-                return LexerToken{
-                    .type = TokenType::FloatLiteral,
-                    .begin = begin,
-                    .end = pos_,
-                };
-            }
+            return read_from_dot();
         }
-        else if (HasChars() && text_[pos_] == 'e')
+        else if (HasChars() && (text_[pos_] == 'e' || text_[pos_] == 'E'))
         {
             return read_exponent();
         }
