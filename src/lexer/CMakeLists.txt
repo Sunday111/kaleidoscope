@@ -14,4 +14,4 @@ file(GLOB_RECURSE cpp_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPEN
 add_library(${target_name} STATIC ${hpp_files} ${cpp_files})
 set_generic_compiler_options(${target_name} PRIVATE)
 target_include_directories(${target_name} PUBLIC ${include_dir})
-target_link_libraries(${target_name} PUBLIC magic_enum::magic_enum ass fast_float)
+target_link_libraries(${target_name} PUBLIC magic_enum::magic_enum ass)

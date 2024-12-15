@@ -17,4 +17,13 @@ enum class TokenType : uint8_t
     OctalLiteral,
     EndOfFile
 };
+
+enum class LexerErrorType : uint8_t
+{
+    UnexpectedSymbol,
+    LeadingZeroInDecimalLiteral,
+    ZeroLengthExponentInScientificNotation,
+    NeedAtLeastOneDigitAroundDotInFloatLiteral,
+    MultipleDotsInFloatingPointLiteral,
+};
 }  // namespace kaleidoscope
