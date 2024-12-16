@@ -28,6 +28,8 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
 # Path to cmake modules
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH};${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
+set(ZLIB_USE_STATIC_LIBS "ON")
+
 # Enable LTO by default for all projects
 include(lto_utility)
 enable_lto_globally()
@@ -76,5 +78,14 @@ FetchContent_Declare(
   GIT_SHALLOW    1
 )
 FetchContent_MakeAvailable(fast_float)
+
+# # cpptrace
+# FetchContent_Declare(
+#   cpptrace
+#   GIT_REPOSITORY https://github.com/jeremy-rifkin/cpptrace
+#   GIT_TAG        "v0.7.4"
+#   GIT_SHALLOW    1
+# )
+# FetchContent_MakeAvailable(cpptrace)
 
 add_subdirectory(src)

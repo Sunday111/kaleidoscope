@@ -12,31 +12,35 @@ int main()
 
     kaleidoscope::Lexer lexer(s);
 
-    auto t = lexer.GetToken();
-
-    auto handle_error = [&]()
+    while (true)
     {
-        if (t.has_value()) return false;
+        auto t = lexer.GetToken();
 
-        std::println("Error: {}", magic_enum::enum_name(t.error().type));
-        return true;
-    };
-
-    while (!handle_error())
-    {
-        if (t->type == kaleidoscope::TokenType::EndOfFile)
+        if (t.has_value())
         {
-            std::println("EOF");
-            break;
+            std::println(
+                "{}, [{}, {}) = {}",
+                magic_enum::enum_name(t->type),
+                t->begin,
+                t->end,
+                std::string_view{s}.substr(t->begin, t->end - t->begin));
+
+            if (t->type == kaleidoscope::TokenType::EndOfFile)
+            {
+                std::println("EOF");
+                break;
+            }
         }
-
-        std::println(
-            "{}, [{}, {}) = {}",
-            magic_enum::enum_name(t->type),
-            t->begin,
-            t->end,
-            std::string_view{s}.substr(t->begin, t->end - t->begin));
-
+        else
+        {
+            auto& err = t.error();
+            std::println(
+                "{}, [{}, {}) = {}",
+                magic_enum::enum_name(err.type),
+                err.begin,
+                err.end,
+                std::string_view{s}.substr(err.begin, err.end - err.begin));
+        }
         t = lexer.GetToken();
     }
 }

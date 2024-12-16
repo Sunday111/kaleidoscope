@@ -26,7 +26,8 @@ public:
     [[nodiscard]] constexpr bool operator==(const LexerError&) const noexcept = default;
 
     LexerErrorType type;
-    size_t pos;
+    size_t begin;
+    size_t end;
 };
 
 using LexerResult = std::expected<LexerToken, LexerError>;
@@ -45,11 +46,7 @@ public:
             if (IsLetter(c)) return ReadIdentifier();
             if (std::isdigit(c) || c == '.') return ReadNumber();
 
-            return std::unexpected(
-                LexerError{
-                    .type = LexerErrorType::UnexpectedSymbol,
-                    .pos = pos_,
-                });
+            return ReadAsError(pos_, LexerErrorType::UnexpectedSymbol);
         }
         else
         {
@@ -61,12 +58,13 @@ public:
         }
     }
 
-    constexpr void SkipCurrent() noexcept
+private:
+    [[nodiscard]] constexpr LexerResult ReadAsError(size_t begin, LexerErrorType error_type)
     {
         while (HasChars() && !IsSpaceChar(text_[pos_])) ++pos_;
+        return std::unexpected(LexerError{.type = error_type, .begin = begin, .end = pos_});
     }
 
-private:
     [[nodiscard]] static constexpr bool OneOf(char c, const ass::FixedBitset<256>& b)
     {
         return b.Get(std::bit_cast<uint8_t>(c));
@@ -97,11 +95,7 @@ private:
             {
                 if (dot)
                 {
-                    return std::unexpected(
-                        LexerError{
-                            .type = LexerErrorType::MultipleDotsInFloatingPointLiteral,
-                            .pos = pos_,
-                        });
+                    return ReadAsError(begin, LexerErrorType::MultipleDotsInFloatingPointLiteral);
                 }
 
                 dot = pos_;
@@ -112,26 +106,25 @@ private:
 
         if (dot && begin + 1 == pos_)
         {
-            return std::unexpected(
-                LexerError{
-                    .type = LexerErrorType::NeedAtLeastOneDigitAroundDotInFloatLiteral,
-                    .pos = *dot,
-                });
+            return ReadAsError(begin, LexerErrorType::NeedAtLeastOneDigitAroundDotInFloatLiteral);
         }
 
         // Scientific notation
         if (HasChars() && (text_[pos_] == 'e' || text_[pos_] == 'E'))
         {
-            size_t e = pos_++;
+            size_t exp_or_sign = pos_++;
+
+            // Can have + or - just after an exponent sign
+            if (HasChars() && (text_[pos_] == '+' || text_[pos_] == '-'))
+            {
+                exp_or_sign = pos_++;
+            }
+
             while (HasChars() && IsDigit(text_[pos_])) ++pos_;
 
-            if (pos_ - e == 1)
+            if (pos_ - exp_or_sign == 1)
             {
-                return std::unexpected(
-                    LexerError{
-                        .type = LexerErrorType::ZeroLengthExponentInScientificNotation,
-                        .pos = e,
-                    });
+                return ReadAsError(begin, LexerErrorType::ZeroLengthExponentInScientificNotation);
             }
 
             if (HasChars())
@@ -139,11 +132,7 @@ private:
                 char c = text_[pos_];
                 if (!IsSpaceChar(c) && c != '_')
                 {
-                    return std::unexpected(
-                        LexerError{
-                            .type = LexerErrorType::UnexpectedSymbol,
-                            .pos = pos_,
-                        });
+                    return ReadAsError(begin, LexerErrorType::UnexpectedSymbol);
                 }
             }
         }
@@ -164,11 +153,7 @@ private:
             ++pos_;
             if (HasChars() && IsDigit(text_[pos_]))
             {
-                return std::unexpected(
-                    LexerError{
-                        .type = LexerErrorType::LeadingZeroInDecimalLiteral,
-                        .pos = pos_,
-                    });
+                return ReadAsError(begin, LexerErrorType::LeadingZeroInDecimalLiteral);
             }
         }
 
@@ -179,11 +164,7 @@ private:
             char c = text_[pos_];
             if (!IsSpaceChar(c) && c != '_')
             {
-                return std::unexpected(
-                    LexerError{
-                        .type = LexerErrorType::UnexpectedSymbol,
-                        .pos = pos_,
-                    });
+                return ReadAsError(begin, LexerErrorType::UnexpectedSymbol);
             }
         }
 
@@ -194,7 +175,7 @@ private:
         };
     }
 
-    [[nodiscard]] constexpr LexerResult ReadHexNumber() noexcept
+    [[nodiscard]] constexpr LexerResult ReadHexadecimalLiteral() noexcept
     {
         size_t begin = pos_;
 
@@ -202,16 +183,17 @@ private:
 
         while (HasChars() && IsHexDigit(text_[pos_])) ++pos_;
 
+        if (pos_ < begin + 3)
+        {
+            return ReadAsError(begin, LexerErrorType::UnexpectedSymbol);
+        }
+
         if (HasChars())
         {
             char c = text_[pos_];
             if (!IsSpaceChar(c) && c != '_')
             {
-                return std::unexpected(
-                    LexerError{
-                        .type = LexerErrorType::UnexpectedSymbol,
-                        .pos = pos_,
-                    });
+                return ReadAsError(begin, LexerErrorType::UnexpectedSymbol);
             }
         }
 
@@ -222,7 +204,7 @@ private:
         };
     }
 
-    [[nodiscard]] constexpr LexerResult ReadBinaryNumber() noexcept
+    [[nodiscard]] constexpr LexerResult ReadBinaryLiteral() noexcept
     {
         size_t begin = pos_;
         pos_ += 2;
@@ -235,11 +217,7 @@ private:
             char c = text_[pos_];
             if (!IsSpaceChar(c) && c != '_')
             {
-                return std::unexpected(
-                    LexerError{
-                        .type = LexerErrorType::UnexpectedSymbol,
-                        .pos = pos_,
-                    });
+                return ReadAsError(begin, LexerErrorType::UnexpectedSymbol);
             }
         }
 
@@ -261,11 +239,7 @@ private:
             char c = text_[pos_];
             if (!IsSpaceChar(c) && c != '_')
             {
-                return std::unexpected(
-                    LexerError{
-                        .type = LexerErrorType::UnexpectedSymbol,
-                        .pos = pos_,
-                    });
+                return ReadAsError(begin, LexerErrorType::UnexpectedSymbol);
             }
         }
 
@@ -303,11 +277,11 @@ private:
             {
             case 'x':
             case 'X':
-                return ReadHexNumber();
+                return ReadHexadecimalLiteral();
                 break;
             case 'b':
             case 'B':
-                return ReadBinaryNumber();
+                return ReadBinaryLiteral();
                 break;
             }
 

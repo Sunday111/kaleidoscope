@@ -17,10 +17,6 @@ public:
         for (auto& slot : tokens_)
         {
             slot = lexer_->GetToken();
-            if (!slot.has_value())
-            {
-                lexer_->SkipCurrent();
-            }
         }
     }
 
