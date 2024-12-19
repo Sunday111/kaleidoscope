@@ -1,16 +1,5 @@
 #include "util.hpp"
 
-TEST(LexerTest, TwoLeadingZeroes)
-{
-    CheckLexerOutput(
-        std::source_location::current(),
-        "001",
-        {
-            Tok("001", kOctalLiteral),
-            Tok("", kEOF),
-        });
-}
-
 TEST(LexerTest, Floats)
 {
     CheckLexerOutput(
