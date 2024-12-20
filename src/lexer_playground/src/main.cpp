@@ -41,6 +41,5 @@ int main()
                 err.end,
                 std::string_view{s}.substr(err.begin, err.end - err.begin));
         }
-        t = lexer.GetToken();
     }
 }

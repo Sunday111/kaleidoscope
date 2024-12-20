@@ -27,10 +27,9 @@ public:
 
     [[nodiscard]] constexpr LexerResult Take() noexcept
     {
-        LexerResult token = std::move(tokens_[start_index_]);
-        tokens_[start_index_] = lexer_->GetToken();
+        LexerResult result = std::exchange(tokens_[start_index_], lexer_->GetToken());
         start_index_ = (start_index_ + 1) % tokens_.size();
-        return token;
+        return result;
     }
 
 private:

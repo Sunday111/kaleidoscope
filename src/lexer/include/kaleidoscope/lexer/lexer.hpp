@@ -44,7 +44,10 @@ public:
         {
             const char c = text_[pos_];
             if (IsLetter(c)) return ReadIdentifier();
-            if (std::isdigit(c) || c == '.') return ReadNumber();
+            if (std::isdigit(c) || c == '.') return ReadNumberLiteral();
+
+            if (MatchesNext("//")) return ReadComment();
+            if (MatchesNext("/*")) return ReadBlockComment();
 
             return ReadAsError(pos_, LexerErrorType::UnexpectedSymbol);
         }
@@ -59,6 +62,12 @@ public:
     }
 
 private:
+    // Returns true if the stream starts with the specified sequence at the current position
+    [[nodiscard]] constexpr bool MatchesNext(std::string_view expected) const
+    {
+        return text_.substr(pos_).starts_with(expected);
+    }
+
     [[nodiscard]] constexpr LexerResult ReadAsError(size_t begin, LexerErrorType error_type)
     {
         while (HasChars() && !IsSpaceChar(text_[pos_])) ++pos_;
@@ -78,7 +87,57 @@ private:
     [[nodiscard]] static constexpr bool IsSpaceChar(char c) { return OneOf(c, kSpaceChars); }
     [[nodiscard]] static constexpr bool IsPossibleNumberCharacter(char c) { return OneOf(c, kSpaceChars); }
 
-    [[nodiscard]] constexpr LexerResult ReadFloatingPointNumber() noexcept
+    [[nodiscard]] constexpr LexerResult ReadComment() noexcept
+    {
+        size_t begin = pos_;
+        pos_ += 2;
+
+        while (HasChars() && text_[pos_] != '\n')
+        {
+            ++pos_;
+        }
+
+        size_t end = pos_;
+        SkipSpaces();
+
+        return LexerToken{
+            .type = TokenType::Comment,
+            .begin = begin,
+            .end = end,
+        };
+    }
+
+    [[nodiscard]] constexpr LexerResult ReadBlockComment() noexcept
+    {
+        const size_t begin = std::exchange(pos_, pos_ + 2);
+
+        while (HasChars() && !MatchesNext("*/"))
+        {
+            ++pos_;
+        }
+
+        if (!(HasChars() && MatchesNext("*/")))
+        {
+            return std::unexpected(
+                LexerError{
+                    .type = LexerErrorType::UnterminatedBlockComment,
+                    .begin = begin,
+                    .end = pos_,
+                });
+        }
+
+        pos_ += 2;
+
+        const size_t end = pos_;
+        SkipSpaces();
+        return LexerToken{
+            .type = TokenType::BlockComment,
+            .begin = begin,
+            .end = end,
+        };
+    }
+
+    [[nodiscard]] constexpr LexerResult ReadFloatingPointLiteral() noexcept
     {
         size_t begin = pos_;
         std::optional<size_t> dot;
@@ -250,7 +309,7 @@ private:
         };
     }
 
-    [[nodiscard]] constexpr LexerResult ReadNumber() noexcept
+    [[nodiscard]] constexpr LexerResult ReadNumberLiteral() noexcept
     {
         assert(HasChars());
 
@@ -288,7 +347,7 @@ private:
             if (IsDigit(char_after_zero)) return ReadOctalNumber();
         }
 
-        return ReadFloatingPointNumber();
+        return ReadFloatingPointLiteral();
     }
 
     [[nodiscard]] constexpr LexerToken ReadIdentifier() noexcept

@@ -74,3 +74,43 @@ TEST(LexerTest, HexLiteral)
             Tok("", kEOF),
         });
 }
+
+TEST(LexerTest, Comment)
+{
+    CheckLexerOutput(
+        std::source_location::current(),
+        R"(a b c // commented
+               d e f)",
+        {
+            Tok("a", kIdentifier),
+            Tok("b", kIdentifier),
+            Tok("c", kIdentifier),
+            Tok("// commented", TokenType::Comment),
+            Tok("d", kIdentifier),
+            Tok("e", kIdentifier),
+            Tok("f", kIdentifier),
+            Tok("", kEOF),
+        });
+}
+
+TEST(LexerTest, BlockComment)
+{
+    CheckLexerOutput(
+        std::source_location::current(),
+        "a b c /* d e f */ g h i /* j k l \n m n o */ p q r /* bla",
+        {
+            Tok("a", kIdentifier),
+            Tok("b", kIdentifier),
+            Tok("c", kIdentifier),
+            Tok("/* d e f */", TokenType::BlockComment),
+            Tok("g", kIdentifier),
+            Tok("h", kIdentifier),
+            Tok("i", kIdentifier),
+            Tok("/* j k l \n m n o */", TokenType::BlockComment),
+            Tok("p", kIdentifier),
+            Tok("q", kIdentifier),
+            Tok("r", kIdentifier),
+            Err("/* bla", LexerErrorType::UnterminatedBlockComment),
+            Tok("", kEOF),
+        });
+}

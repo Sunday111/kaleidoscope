@@ -11,6 +11,7 @@
 using namespace kaleidoscope;  // NOLINT
 // IWYU pragma: end_exports
 
+inline constexpr auto kIdentifier = TokenType::Identifier;
 inline constexpr auto kDecimalLiteral = TokenType::DecimalLiteral;
 inline constexpr auto kHexLiteral = TokenType::HexadecimalLiteral;
 inline constexpr auto kOctalLiteral = TokenType::OctalLiteral;
