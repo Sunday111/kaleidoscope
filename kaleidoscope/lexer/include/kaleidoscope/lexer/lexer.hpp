@@ -43,7 +43,7 @@ public:
         if (HasChars())
         {
             const char c = text_[pos_];
-            if (IsLetter(c)) return ReadIdentifier();
+            if (IsValidIdentifierHeadChar(c)) return ReadIdentifier();
             if (std::isdigit(c) || c == '.') return ReadNumberLiteral();
 
             if (MatchesNext("//")) return ReadComment();
@@ -79,13 +79,11 @@ private:
         return b.Get(std::bit_cast<uint8_t>(c));
     }
 
-    [[nodiscard]] static constexpr bool IsLetter(char c) { return OneOf(c, kLetters); }
     [[nodiscard]] static constexpr bool IsDigit(char c) { return OneOf(c, kDigits); }
     [[nodiscard]] static constexpr bool IsHexDigit(char c) { return OneOf(c, kHexDigits); }
     [[nodiscard]] static constexpr bool IsValidIdentifierHeadChar(char c) { return OneOf(c, kIdentifierHeadChars); }
     [[nodiscard]] static constexpr bool IsValidIdentifierTailChar(char c) { return OneOf(c, kIdentifierTailChars); }
     [[nodiscard]] static constexpr bool IsSpaceChar(char c) { return OneOf(c, kSpaceChars); }
-    [[nodiscard]] static constexpr bool IsPossibleNumberCharacter(char c) { return OneOf(c, kSpaceChars); }
 
     [[nodiscard]] constexpr LexerResult ReadComment() noexcept
     {
@@ -337,11 +335,9 @@ private:
             case 'x':
             case 'X':
                 return ReadHexadecimalLiteral();
-                break;
             case 'b':
             case 'B':
                 return ReadBinaryLiteral();
-                break;
             }
 
             if (IsDigit(char_after_zero)) return ReadOctalNumber();

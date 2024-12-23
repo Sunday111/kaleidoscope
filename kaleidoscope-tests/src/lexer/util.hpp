@@ -14,6 +14,7 @@ using namespace kaleidoscope;  // NOLINT
 inline constexpr auto kIdentifier = TokenType::Identifier;
 inline constexpr auto kDecimalLiteral = TokenType::DecimalLiteral;
 inline constexpr auto kHexLiteral = TokenType::HexadecimalLiteral;
+inline constexpr auto kBinaryLiteral = TokenType::BinaryLiteral;
 inline constexpr auto kOctalLiteral = TokenType::OctalLiteral;
 inline constexpr auto kFloatLiteral = TokenType::FloatLiteral;
 inline constexpr auto kEOF = TokenType::EndOfFile;

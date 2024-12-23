@@ -10,8 +10,12 @@ inline constexpr auto kKeywordLookup = []
 {
     auto hasher = [](const std::string_view s) -> size_t
     {
-        if (s.empty()) return 0;
-        return std::bit_cast<uint8_t>(s.front());
+        size_t hash = 0;
+        [[likely]] if (!s.empty())
+        {
+            hash |= std::bit_cast<uint8_t>(s.front());
+        }
+        return hash;
     };
 
     ass::FixedUnorderedMap<10, std::string_view, TokenType, decltype(hasher)> m;
