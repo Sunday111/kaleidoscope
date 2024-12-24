@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <expected>
+#include <print>
 #include <string_view>
 
 #include "lexer_data.hpp"
@@ -45,6 +46,7 @@ public:
             const char c = text_[pos_];
             if (IsValidIdentifierHeadChar(c)) return ReadIdentifier();
             if (std::isdigit(c) || c == '.') return ReadNumberLiteral();
+            if (c == '"') return ReadStringLiteral();
 
             if (MatchesNext("//")) return ReadComment();
             if (MatchesNext("/*")) return ReadBlockComment();
@@ -370,6 +372,50 @@ private:
         }
 
         return token;
+    }
+
+    [[nodiscard]] constexpr LexerResult ReadStringLiteral() noexcept
+    {
+        size_t begin = pos_;
+
+        while (true)
+        {
+            ++pos_;
+            if (!HasChars())
+            {
+                return std::unexpected(
+                    LexerError{
+                        .type = LexerErrorType::MissingTerminatingCharacterForStringLiteral,
+                        .begin = begin,
+                        .end = pos_,
+                    });
+            }
+
+            const char c = text_[pos_];
+            switch (c)
+            {
+            case '\n':
+                return std::unexpected(
+                    LexerError{
+                        .type = LexerErrorType::MissingTerminatingCharacterForStringLiteral,
+                        .begin = begin,
+                        .end = pos_,
+                    });
+            case '\\':
+                if (pos_ + 1 != text_.size() && text_[pos_ + 1] == '"')
+                {
+                    ++pos_;
+                }
+
+                break;
+            case '"':
+                return LexerToken{
+                    .type = TokenType::StringLiteral,
+                    .begin = begin,
+                    .end = ++pos_,
+                };
+            }
+        }
     }
 
     [[nodiscard]] constexpr bool HasChars() const noexcept { return pos_ < text_.size(); }

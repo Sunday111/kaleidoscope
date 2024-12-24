@@ -12,8 +12,10 @@ SRC_DIR = ROOT_DIR / "kaleidoscope"
 
 
 def main():
-
-    executables: list[Path] = [BIN_DIR / "kaleidoscope-tests"]
+    executables: list[Path] = [
+        BIN_DIR / "kaleidoscope-tests",
+        BIN_DIR / "ass_tests",
+    ]
 
     subprocess.check_call(["cmake", "--build", BUILD_DIR])
 
@@ -50,7 +52,6 @@ def main():
                 "--show-instantiation-summary",
                 "--show-mcdc-summary",
                 "--show-region-summary",
-                SRC_DIR,
             ]
         )
 

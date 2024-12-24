@@ -15,6 +15,7 @@ enum class TokenType : uint8_t
     HexadecimalLiteral,
     BinaryLiteral,
     OctalLiteral,
+    StringLiteral,
     Comment,
     BlockComment,
     EndOfFile
@@ -28,5 +29,7 @@ enum class LexerErrorType : uint8_t
     NeedAtLeastOneDigitAroundDotInFloatLiteral,
     MultipleDotsInFloatingPointLiteral,
     UnterminatedBlockComment,
+    MissingTerminatingCharacterForStringLiteral,
 };
+
 }  // namespace kaleidoscope

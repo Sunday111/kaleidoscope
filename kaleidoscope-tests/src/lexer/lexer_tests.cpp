@@ -190,3 +190,21 @@ TEST(LexerTest, Keywords)
             Tok("", kEOF),
         });
 }
+
+TEST(LexerTest, StringLiteral)
+{
+    CheckLexerOutput(
+        std::source_location::current(),
+        R"(
+                "hello, world!"
+                "Contains double quote:\""
+                "string literal
+                "string literal)",
+        {
+            Tok(R"("hello, world!")", TokenType::StringLiteral),
+            Tok(R"("Contains double quote:\"")", TokenType::StringLiteral),
+            Err(R"("string literal)", LexerErrorType::MissingTerminatingCharacterForStringLiteral),
+            Err(R"("string literal)", LexerErrorType::MissingTerminatingCharacterForStringLiteral),
+            Tok("", kEOF),
+        });
+}
