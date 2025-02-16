@@ -18,6 +18,10 @@ enum class TokenType : uint8_t
     StringLiteral,
     Comment,
     BlockComment,
+    Plus,
+    Minus,
+    Asterisk,
+    ForwardSlash,
     EndOfFile
 };
 

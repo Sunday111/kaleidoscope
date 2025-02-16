@@ -32,6 +32,29 @@ inline constexpr auto kKeywordLookup = []
     return m;
 }();
 
+inline constexpr auto kOperatorSymbolLookup = []
+{
+    auto hasher = [](char c) -> size_t
+    {
+        return std::bit_cast<uint8_t>(c);
+    };
+
+    ass::FixedUnorderedMap<10, char, TokenType, decltype(hasher)> m;
+
+    auto add = [&m](char c, TokenType token_type)
+    {
+        assert(!m.Contains(c));
+        m.Add(c, token_type);
+    };
+
+    add('+', TokenType::Plus);
+    add('-', TokenType::Minus);
+    add('*', TokenType::Asterisk);
+    add('/', TokenType::ForwardSlash);
+
+    return m;
+}();
+
 [[nodiscard]] constexpr auto BitsetFromChars(std::string_view s)
 {
     ass::FixedBitset<256> b;
@@ -69,4 +92,5 @@ inline constexpr auto kIdentifierTailChars = kIdentifierHeadChars | kDigits;
 inline constexpr auto kSpaceChars = BitsetFromChars(" \f\n\r\t\v");
 inline constexpr auto kHexDigits = kDigits | BitsetFromCharRange('a', 'f') | BitsetFromCharRange('A', 'F');
 inline constexpr auto kOctalDigits = BitsetFromCharRange('0', '7');
+inline constexpr auto kBinaryOperator = BitsetFromChars("+-*/");
 }  // namespace kaleidoscope

@@ -32,6 +32,11 @@ public:
         return result;
     }
 
+    [[nodiscard]] constexpr std::string_view GetTokenView(const LexerToken& lexer_token) const
+    {
+        return lexer_->GetTokenView(lexer_token);
+    }
+
 private:
     Lexer* lexer_ = nullptr;
     std::array<LexerResult, horizon_size> tokens_;

@@ -208,3 +208,22 @@ TEST(LexerTest, StringLiteral)
             Tok("", kEOF),
         });
 }
+
+TEST(LexerTest, Operators)
+{
+    CheckLexerOutput(
+        std::source_location::current(),
+        "42 + 69- 3 /2 ++",
+        {
+            Tok("42", kDecimalLiteral),
+            Tok("+", TokenType::Plus),
+            Tok("69", kDecimalLiteral),
+            Tok("-", TokenType::Minus),
+            Tok("3", kDecimalLiteral),
+            Tok("/", TokenType::ForwardSlash),
+            Tok("2", kDecimalLiteral),
+            Tok("+", TokenType::Plus),
+            Tok("+", TokenType::Plus),
+            Tok("", kEOF),
+        });
+}

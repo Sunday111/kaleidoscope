@@ -11,6 +11,26 @@ public:
     constexpr virtual ~ExprAST() = default;
 };
 
+enum class ExprType : uint8_t
+{
+    IntegralLiteral,
+    BinaryOperator,
+};
+
+enum class ParserErrorType : uint8_t
+{
+    UnexpectedToken
+};
+
+class ExprId
+{
+public:
+    ExprType type;
+    uint32_t index;
+};
+
+using ExprASTResult = std::expected<ExprId, ParserErrorType>;
+
 class IntegralLiteralExprAST : public ExprAST
 {
 public:
@@ -25,8 +45,20 @@ public:
     std::variant<float, double> value;
 };
 
-class Parser
+enum class BinaryOperatorType : uint8_t
+{
+    Plus,
+    Minus,
+    Multiply,
+    Divide
+};
+
+class BinaryOperatorExpression : public ExprAST
 {
 public:
+    ExprId left;
+    ExprId right;
+    BinaryOperatorType type;
 };
+
 }  // namespace kaleidoscope

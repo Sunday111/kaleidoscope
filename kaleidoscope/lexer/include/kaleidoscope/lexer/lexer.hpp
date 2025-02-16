@@ -2,7 +2,6 @@
 
 #include <cassert>
 #include <expected>
-#include <print>
 #include <string_view>
 
 #include "lexer_data.hpp"
@@ -44,12 +43,22 @@ public:
         if (HasChars())
         {
             const char c = text_[pos_];
+
             if (IsValidIdentifierHeadChar(c)) return ReadIdentifier();
             if (std::isdigit(c) || c == '.') return ReadNumberLiteral();
             if (c == '"') return ReadStringLiteral();
-
             if (MatchesNext("//")) return ReadComment();
             if (MatchesNext("/*")) return ReadBlockComment();
+
+            if (const TokenType* op_type = kOperatorSymbolLookup.Find(c))
+            {
+                const auto p = pos_++;
+                return LexerToken{
+                    .type = *op_type,
+                    .begin = p,
+                    .end = p + 1,
+                };
+            }
 
             return ReadAsError(pos_, LexerErrorType::UnexpectedSymbol);
         }
@@ -61,6 +70,18 @@ public:
                 .end = pos_,
             };
         }
+    }
+
+    [[nodiscard]] constexpr std::string_view GetTokenView(const LexerToken& lexer_token) const
+    {
+        [[unlikely]] if (lexer_token.type == TokenType::EndOfFile)
+        {
+            return "";
+        }
+
+        const char* begin = &text_[lexer_token.begin];  // NOLINT
+        const char* end = &text_[lexer_token.end];      // NOLINT
+        return std::string_view(begin, end);
     }
 
 private:
@@ -221,7 +242,7 @@ private:
         if (HasChars())
         {
             char c = text_[pos_];
-            if (!IsSpaceChar(c) && c != '_')
+            if (!IsSpaceChar(c) && c != '_' && !kOperatorSymbolLookup.Contains(c))
             {
                 return ReadAsError(begin, LexerErrorType::UnexpectedSymbol);
             }
