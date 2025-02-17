@@ -1,4 +1,5 @@
 #include <bit>
+#include <format>
 
 #include "kaleidoscope/parser/parser.hpp"
 #include "util.hpp"
@@ -185,4 +186,85 @@ TEST(ParserTests, Plus)
     ASSERT_EQ(right_ast->bits_count, 64);
     ASSERT_EQ(right_ast->is_signed, false);
     ASSERT_EQ(right_ast->value, 2);
+}
+
+class CodeGen_LLVM_IR
+{
+public:
+    constexpr explicit CodeGen_LLVM_IR(const Parser& parser, std::span<char> out, size_t first_variable_index = 0)
+        : out_{out.data()},
+          out_size_{std::ssize(out)},
+          next_var_{first_variable_index},
+          parser_{parser}
+    {
+    }
+
+    template <typename... FormatArgs>
+    constexpr void Write(std::format_string<FormatArgs...> format_string, FormatArgs&&... args)
+    {
+        const std::format_to_n_result format_result =
+            std::format_to_n(out_, out_size_, format_string, std::forward<FormatArgs>(args)...);
+
+        out_size_ -= std::distance(out_, format_result.out);
+        out_ = format_result.out;
+        required_space_ += static_cast<size_t>(format_result.size);
+    }
+
+    // Returns variable index where result of expression will be stored
+    [[nodiscard]] constexpr size_t Gen(const IntegralLiteralExprAST& literal)
+    {
+        assert(literal.bits_count == 32 || literal.bits_count == 64);
+
+        const size_t var_ptr_id = next_var_++;
+        const size_t var_id = next_var_++;
+        const size_t align = literal.bits_count == 32 ? 4 : 8;
+
+        Write("%{} = alloca i{}, align {}\n", var_ptr_id, literal.bits_count, align);
+        Write("store i{} {}, ptr %{}, align {}\n", literal.bits_count, literal.value, var_ptr_id, align);
+        Write("%{} = load i{}, ptr %{}, align {}\n", var_id, literal.bits_count, var_ptr_id, align);
+
+        return var_id;
+    }
+
+    // Returns variable index where result of expression will be stored
+    [[nodiscard]] constexpr size_t Gen(const BinaryOperatorExpression& binary_operator)
+    {
+        assert(binary_operator.left.type == ExprType::IntegralLiteral);
+        assert(binary_operator.right.type == ExprType::IntegralLiteral);
+        const size_t left = Gen(*parser_.GetExprAst<ExprType::IntegralLiteral>(binary_operator.left.index));
+        const size_t right = Gen(*parser_.GetExprAst<ExprType::IntegralLiteral>(binary_operator.right.index));
+        const size_t var_id = next_var_++;
+
+        Write("%{} = add i{} %{}, %{}\n", var_id, 64, left, right);
+
+        return var_id;
+    }
+
+    char* out_;
+    ssize_t out_size_;
+    size_t next_var_ = 0;
+    size_t required_space_ = 0;
+    const Parser& parser_;  // NOLINT
+};
+
+TEST(ParserTests, Gen)
+{
+    Lexer l("1 + 2");
+    LookaheadLexer<5> lexer(l);
+
+    Parser parser;
+    auto r = parser.ParseExpression(lexer);
+    ASSERT_TRUE(r.has_value());
+    ASSERT_EQ(r->type, ExprType::BinaryOperator);
+
+    auto* opt_ast = parser.GetExprAst<ExprType::BinaryOperator>(r->index);
+    ASSERT_NE(opt_ast, nullptr);
+    ASSERT_EQ(opt_ast->type, BinaryOperatorType::Plus);
+
+    std::vector<char> data;
+    data.resize(2048, 0);
+    CodeGen_LLVM_IR g{parser, data};
+    [[maybe_unused]] size_t id = g.Gen(*opt_ast);
+    ASSERT_LE(g.required_space_, data.size());
+    std::println("{}", data.data());
 }
