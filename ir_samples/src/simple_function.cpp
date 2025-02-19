@@ -1,6 +1,6 @@
 #include "stdio.h"
 
-int g(unsigned a, int b, int c) {
+inline int g(int a, int b, int c) {
     return a + b * c;
 }
 
