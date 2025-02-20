@@ -1,7 +1,9 @@
 #include <bit>
+#include <cstdio>
 #include <format>
 
 #include "kaleidoscope/parser/parser.hpp"
+#include "run_process.hpp"
 #include "util.hpp"
 
 namespace kaleidoscope
@@ -235,7 +237,21 @@ public:
         const size_t right = Gen(*parser_.GetExprAst<ExprType::IntegralLiteral>(binary_operator.right.index));
         const size_t var_id = next_var_++;
 
-        Write("%{} = add i{} %{}, %{}\n", var_id, 64, left, right);
+        auto op = [&]() -> std::string_view
+        {
+            switch (binary_operator.type)
+            {
+            case BinaryOperatorType::Plus:
+                return "add";
+            case BinaryOperatorType::Minus:
+                return "sub";
+            default:
+                assert(false);
+                return "";
+            }
+        }();
+
+        Write("%{} = {} i{} %{}, %{}\n", var_id, op, 64, left, right);
 
         return var_id;
     }
@@ -249,7 +265,7 @@ public:
 
 TEST(ParserTests, Gen)
 {
-    Lexer l("1 + 2");
+    Lexer l("42 - 21");
     LookaheadLexer<5> lexer(l);
 
     Parser parser;
@@ -259,11 +275,11 @@ TEST(ParserTests, Gen)
 
     auto* opt_ast = parser.GetExprAst<ExprType::BinaryOperator>(r->index);
     ASSERT_NE(opt_ast, nullptr);
-    ASSERT_EQ(opt_ast->type, BinaryOperatorType::Plus);
+    ASSERT_EQ(opt_ast->type, BinaryOperatorType::Minus);
 
     std::vector<char> data;
     data.resize(2048, 0);
-    CodeGen_LLVM_IR g{parser, data};
+    CodeGen_LLVM_IR g{parser, data, 1};
     [[maybe_unused]] size_t id = g.Gen(*opt_ast);
     ASSERT_LE(g.required_space_, data.size());
     std::println("{}", data.data());

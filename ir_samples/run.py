@@ -183,16 +183,6 @@ def emit_programs():
     )
 
 
-# def emit_programs():
-#     transform_files(
-#         get_src_dir=get_asm_dir,
-#         src_ext=".s",
-#         get_dst_dir=get_program_dir,
-#         dst_ext="",
-#         transformer=link_file,
-#     )
-
-
 def main():
     shutil.rmtree(GENERATED_ROOT_DIR, ignore_errors=True)
     emit_llvm_ir()

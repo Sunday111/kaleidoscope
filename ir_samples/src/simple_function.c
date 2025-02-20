@@ -1,7 +1,7 @@
 #include "stdio.h"
 
 int g(int a, int b, int c) {
-    return a + b * c;
+    return a - b * c;
 }
 
 int main() {
