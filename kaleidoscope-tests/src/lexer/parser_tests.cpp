@@ -263,8 +263,21 @@ public:
     const Parser& parser_;  // NOLINT
 };
 
+using namespace std::literals;
+
 TEST(ParserTests, Gen)
 {
+    constexpr std::array command{
+        "clang++-18"s,
+        "-v"s,
+    };
+    auto proc_out = RunProcess(command);
+    ASSERT_TRUE(proc_out.has_value());
+    const auto& proc_result = *proc_out;
+    std::println("clang status: {}", proc_result.status);
+    std::println("clang stdout: {}", SpanAsStringView(std::span{proc_result.out}));
+    std::println("clang stderr: {}", SpanAsStringView(std::span{proc_result.err}));
+
     Lexer l("42 - 21");
     LookaheadLexer<5> lexer(l);
 
