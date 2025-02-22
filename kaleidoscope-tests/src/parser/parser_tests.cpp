@@ -2,8 +2,8 @@
 #include <cstdio>
 #include <format>
 
+#include "ir_expression_executor.hpp"
 #include "kaleidoscope/parser/parser.hpp"
-#include "run_process.hpp"
 #include "util.hpp"
 
 namespace kaleidoscope
@@ -42,8 +42,8 @@ public:
         uint32_t index = static_cast<uint32_t>(integral_literals_.size());
         IntegralLiteralExprAST& expr = integral_literals_.emplace_back();
         expr.value = value;
-        expr.bits_count = 64;
-        expr.is_signed = false;
+        expr.type.bits = 32;
+        expr.type.type = BuiltinType::SignedInteger;
 
         return ExprId{
             .type = ExprType::IntegralLiteral,
@@ -156,8 +156,7 @@ TEST(ParserTests, TwoLeadingZeroes)
 
     auto* ast = parser.GetExprAst<ExprType::IntegralLiteral>(r->index);
     ASSERT_NE(ast, nullptr);
-    ASSERT_EQ(ast->bits_count, 64);
-    ASSERT_EQ(ast->is_signed, false);
+    ASSERT_EQ(ast->type.bits, 32);
     ASSERT_EQ(ast->value, 1234);
 }
 
@@ -178,15 +177,13 @@ TEST(ParserTests, Plus)
     ASSERT_EQ(opt_ast->left.type, ExprType::IntegralLiteral);
     auto* left_ast = parser.GetExprAst<ExprType::IntegralLiteral>(opt_ast->left.index);
     ASSERT_NE(left_ast, nullptr);
-    ASSERT_EQ(left_ast->bits_count, 64);
-    ASSERT_EQ(left_ast->is_signed, false);
+    ASSERT_EQ(left_ast->type.bits, 32);
     ASSERT_EQ(left_ast->value, 1);
 
     ASSERT_EQ(opt_ast->right.type, ExprType::IntegralLiteral);
     auto* right_ast = parser.GetExprAst<ExprType::IntegralLiteral>(opt_ast->right.index);
     ASSERT_NE(right_ast, nullptr);
-    ASSERT_EQ(right_ast->bits_count, 64);
-    ASSERT_EQ(right_ast->is_signed, false);
+    ASSERT_EQ(right_ast->type.bits, 32);
     ASSERT_EQ(right_ast->value, 2);
 }
 
@@ -215,15 +212,15 @@ public:
     // Returns variable index where result of expression will be stored
     [[nodiscard]] constexpr size_t Gen(const IntegralLiteralExprAST& literal)
     {
-        assert(literal.bits_count == 32 || literal.bits_count == 64);
+        assert(literal.type.bits == 32 || literal.type.bits == 64);
 
         const size_t var_ptr_id = next_var_++;
         const size_t var_id = next_var_++;
-        const size_t align = literal.bits_count == 32 ? 4 : 8;
+        const size_t align = literal.type.bits == 32 ? 4 : 8;
 
-        Write("%{} = alloca i{}, align {}\n", var_ptr_id, literal.bits_count, align);
-        Write("store i{} {}, ptr %{}, align {}\n", literal.bits_count, literal.value, var_ptr_id, align);
-        Write("%{} = load i{}, ptr %{}, align {}\n", var_id, literal.bits_count, var_ptr_id, align);
+        Write("%{} = alloca i{}, align {}\n", var_ptr_id, literal.type.bits, align);
+        Write("store i{} {}, ptr %{}, align {}\n", literal.type.bits, literal.value, var_ptr_id, align);
+        Write("%{} = load i{}, ptr %{}, align {}\n", var_id, literal.type.bits, var_ptr_id, align);
 
         return var_id;
     }
@@ -251,7 +248,7 @@ public:
             }
         }();
 
-        Write("%{} = {} i{} %{}, %{}\n", var_id, op, 64, left, right);
+        Write("%{} = {} i{} %{}, %{}\n", var_id, op, 32, left, right);
 
         return var_id;
     }
@@ -267,17 +264,6 @@ using namespace std::literals;
 
 TEST(ParserTests, Gen)
 {
-    constexpr std::array command{
-        "clang++-18"s,
-        "-v"s,
-    };
-    auto proc_out = RunProcess(command);
-    ASSERT_TRUE(proc_out.has_value());
-    const auto& proc_result = *proc_out;
-    std::println("clang status: {}", proc_result.status);
-    std::println("clang stdout: {}", SpanAsStringView(std::span{proc_result.out}));
-    std::println("clang stderr: {}", SpanAsStringView(std::span{proc_result.err}));
-
     Lexer l("42 - 21");
     LookaheadLexer<5> lexer(l);
 
@@ -293,7 +279,12 @@ TEST(ParserTests, Gen)
     std::vector<char> data;
     data.resize(2048, 0);
     CodeGen_LLVM_IR g{parser, data, 1};
-    [[maybe_unused]] size_t id = g.Gen(*opt_ast);
+    size_t variable_index = g.Gen(*opt_ast);
     ASSERT_LE(g.required_space_, data.size());
-    std::println("{}", data.data());
+
+    std::string var_name = std::format("%{}", variable_index);
+    auto eval_result = IRExpressionExecutor::ExecI32(SpanAsStringView(std::span{data}), var_name);
+
+    ASSERT_TRUE(eval_result.has_value());
+    ASSERT_EQ(eval_result.value(), 21);
 }

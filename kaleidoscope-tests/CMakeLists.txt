@@ -13,6 +13,7 @@ file(GLOB_RECURSE cpp_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPEN
 
 add_executable(${target_name} ${hpp_files} ${cpp_files})
 set_generic_compiler_options(${target_name} PRIVATE)
+target_include_directories(${target_name} PUBLIC ${src_dir})
 target_compile_options(${target_name} PUBLIC ${KALEIDOSCOPE_TEST_COVERAGE_FLAGS})
 target_link_options(${target_name} PUBLIC ${KALEIDOSCOPE_TEST_COVERAGE_FLAGS})
 target_link_libraries(${target_name} PUBLIC kaleidoscope-lexer kaleidoscope-parser gtest_main)

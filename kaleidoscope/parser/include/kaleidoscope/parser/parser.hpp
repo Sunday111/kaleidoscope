@@ -5,6 +5,25 @@
 namespace kaleidoscope
 {
 
+class TypeInfo
+{
+public:
+};
+
+enum class BuiltinType : uint8_t
+{
+    SignedInteger,
+    UnsignedInteger,
+    FloatingPoint
+};
+
+class BuiltinTypeInfo : public TypeInfo
+{
+public:
+    BuiltinType type = BuiltinType::SignedInteger;
+    uint8_t bits = 32;
+};
+
 class ExprAST
 {
 public:
@@ -35,8 +54,7 @@ class IntegralLiteralExprAST : public ExprAST
 {
 public:
     uint64_t value = 0;
-    uint8_t bits_count = 32;
-    bool is_signed = true;
+    BuiltinTypeInfo type{};
 };
 
 class FloatingPointLiteralExprAST : public ExprAST
