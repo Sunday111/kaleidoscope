@@ -79,6 +79,16 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(fast_float)
 
+# fmatlib
+option(FMT_INSTALL "" OFF)
+FetchContent_Declare(
+  fmtlib
+  GIT_REPOSITORY https://github.com/fmtlib/fmt
+  GIT_TAG        "11.1.3"
+  GIT_SHALLOW    1
+)
+FetchContent_MakeAvailable(fmtlib)
+
 # # cpptrace
 # FetchContent_Declare(
 #   cpptrace

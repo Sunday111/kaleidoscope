@@ -2,6 +2,10 @@
 #include <cstdio>
 #include <format>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wfloat-equal"
+#include "fmt/compile.h"
+#pragma clang diagnostic pop
 #include "ir_expression_executor.hpp"
 #include "kaleidoscope/parser/parser.hpp"
 #include "util.hpp"
@@ -187,6 +191,36 @@ TEST(ParserTests, Plus)
     ASSERT_EQ(right_ast->value, 2);
 }
 
+struct FixedBufferOutIt
+{
+    explicit constexpr FixedBufferOutIt(std::span<char> buffer)
+        : size{buffer.size()},
+          out{buffer.data()},
+          end{out + buffer.size()}  // NOLINT
+    {
+    }
+
+    constexpr FixedBufferOutIt& operator=(char c)
+    {
+        if (out != end)
+        {
+            *out = c;
+            std::advance(out, 1);
+        }
+
+        size += 1;
+
+        return *this;
+    }
+
+    constexpr FixedBufferOutIt& operator*() { return *this; }
+    constexpr FixedBufferOutIt& operator++() { return *this; }
+    constexpr FixedBufferOutIt operator++(int) { return *this; }
+
+    size_t size = 0;
+    char *out, *end{};
+};
+
 class CodeGen_LLVM_IR
 {
 public:
@@ -199,10 +233,10 @@ public:
     }
 
     template <typename... FormatArgs>
-    constexpr void Write(std::format_string<FormatArgs...> format_string, FormatArgs&&... args)
+    constexpr void Write(fmt::format_string<FormatArgs...> format_string, FormatArgs&&... args)
     {
-        const std::format_to_n_result format_result =
-            std::format_to_n(out_, out_size_, format_string, std::forward<FormatArgs>(args)...);
+        const auto format_result =
+            fmt::format_to_n(out_, static_cast<size_t>(out_size_), format_string, std::forward<FormatArgs>(args)...);
 
         out_size_ -= std::distance(out_, format_result.out);
         out_ = format_result.out;
@@ -260,7 +294,38 @@ public:
     const Parser& parser_;  // NOLINT
 };
 
-using namespace std::literals;
+[[nodiscard]] inline constexpr std::tuple<size_t, size_t> ExpressionToIR(
+    std::string_view expression,
+    std::span<char> ir)
+{
+    Lexer l(expression);
+    LookaheadLexer<5> lexer(l);
+
+    Parser parser;
+    auto parse_result = parser.ParseExpression(lexer);
+    auto* opt_ast = parser.GetExprAst<ExprType::BinaryOperator>(parse_result->index);
+    CodeGen_LLVM_IR g{parser, ir, 1};
+    size_t variable_index = g.Gen(*opt_ast);
+
+    return {g.required_space_, variable_index};
+}
+
+static_assert(
+    []
+    {
+        std::array<char, 2048> buffer{};
+        constexpr auto f = FMT_COMPILE("{}");
+        fmt::format_to(FixedBufferOutIt{std::span{buffer}}, f, 123);
+        return true;
+    }());
+
+// static_assert(
+//     []
+//     {
+//         std::array<char, 2048> buffer{};
+
+//         return ExpressionToIR("42 - 21", buffer) == std::tuple<size_t, size_t>{192, 5};
+//     }());
 
 TEST(ParserTests, Gen)
 {

@@ -45,7 +45,7 @@ public:
             const char c = text_[pos_];
 
             if (IsValidIdentifierHeadChar(c)) return ReadIdentifier();
-            if (std::isdigit(c) || c == '.') return ReadNumberLiteral();
+            if (IsDigit(c) || c == '.') return ReadNumberLiteral();
             if (c == '"') return ReadStringLiteral();
             if (MatchesNext("//")) return ReadComment();
             if (MatchesNext("/*")) return ReadBlockComment();
